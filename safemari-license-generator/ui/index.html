@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeMari License Generator</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 20px auto; padding: 20px; }
+        .header { background: #2c3e50; color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center; }
+        .content { background: white; padding: 30px; border-radius: 0 0 8px 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 5px; font-weight: 600; color: #333; }
+        input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: #3498db; }
+        .btn { background: #3498db; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+        .btn:hover { background: #2980b9; }
+        .btn:disabled { background: #bdc3c7; cursor: not-allowed; }
+        .result { margin-top: 20px; padding: 15px; background: #ecf0f1; border-radius: 4px; }
+        .license-code { font-family: monospace; font-size: 12px; word-break: break-all; background: #34495e; color: white; padding: 10px; border-radius: 4px; margin: 10px 0; }
+        .error { background: #e74c3c; color: white; padding: 10px; border-radius: 4px; margin: 10px 0; }
+        .success { background: #27ae60; color: white; padding: 10px; border-radius: 4px; margin: 10px 0; }
+        .config-section { border: 1px solid #ddd; padding: 15px; border-radius: 4px; margin-bottom: 20px; }
+        .config-title { font-weight: bold; margin-bottom: 10px; color: #2c3e50; }
+        .copy-btn { background: #27ae60; margin-left: 10px; padding: 5px 10px; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 SafeMari License Generator</h1>
+            <p>Generate encrypted machine-bound licenses</p>
+        </div>
+        
+        <div class="content">
+            <!-- Configuration Section -->
+            <div class="config-section">
+                <div class="config-title">🔧 Configuration</div>
+                <div class="form-group">
+                    <label for="configPassword">Master Password:</label>
+                    <input type="password" id="configPassword" placeholder="Enter master password to unlock generator">
+                </div>
+                <button class="btn" onclick="loadConfig()">Load Configuration</button>
+                <div id="configStatus"></div>
+            </div>
+
+            <!-- License Generation Form -->
+            <div id="generatorForm" style="display: none;">
+                <div class="form-group">
+                    <label for="machineId">Machine ID:</label>
+                    <input type="text" id="machineId" placeholder="e.g., 4F2E9A88B1C7D5E9" maxlength="16">
+                    <small>12-16 hex characters from target machine</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="licenseType">License Duration:</label>
+                    <select id="licenseType" onchange="toggleDateInput()">
+                        <option value="days">Days from today</option>
+                        <option value="date">Specific date</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="daysGroup">
+                    <label for="days">Number of Days:</label>
+                    <input type="number" id="days" value="90" min="1" max="3650">
+                </div>
+
+                <div class="form-group" id="dateGroup" style="display: none;">
+                    <label for="expiryDate">Expiry Date:</label>
+                    <input type="date" id="expiryDate">
+                </div>
+
+                <div class="form-group">
+                    <label for="shipName">Ship Name (Optional):</label>
+                    <input type="text" id="shipName" placeholder="e.g., MV SafeMari Cargo">
+                </div>
+
+                <div class="form-group">
+                    <label for="notes">Notes (Optional):</label>
+                    <textarea id="notes" rows="3" placeholder="Additional notes or comments"></textarea>
+                </div>
+
+                <button class="btn" onclick="generateLicense()">🔑 Generate License</button>
+            </div>
+
+            <!-- Results Section -->
+            <div id="results"></div>
+        </div>
+    </div>
+
+    <script src="generator.js"></script>
+</body>
+</html>

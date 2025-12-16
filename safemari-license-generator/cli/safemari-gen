@@ -1,0 +1,101 @@
+#!/usr/bin/env node
+
+const { program } = require('commander');
+const LicenseGenerator = require('../generator/main');
+const path = require('path');
+
+// Initialize license generator
+const generator = new LicenseGenerator();
+
+// Configure CLI program
+program
+    .name('safemari-gen')
+    .description('SafeMari Cargo Tools License Generator')
+    .version('1.0.0');
+
+// Generate license with expiry date
+program
+    .option('-m, --machine-id <id>', 'Machine ID from ship (12-16 hex characters)')
+    .option('-e, --expiry <date>', 'Expiry date in YYYY-MM-DD format')
+    .option('-d, --days <number>', 'Number of days from today', parseInt)
+    .option('-s, --ship <name>', 'Ship name (optional)')
+    .option('-n, --notes <text>', 'Additional notes (optional)')
+    .option('--verbose', 'Enable verbose output')
+    .action((options) => {
+        try {
+            // Validate required inputs
+            if (!options.machineId) {
+                console.error('❌ Error: Machine ID is required (--machine-id)');
+                console.error('Example: --machine-id 4F2E9A88B1C7');
+                process.exit(1);
+            }
+
+            if (!options.expiry && !options.days) {
+                console.error('❌ Error: Either expiry date (--expiry) or days (--days) must be specified');
+                console.error('Example: --expiry 2026-03-01 OR --days 90');
+                process.exit(1);
+            }
+
+            if (options.expiry && options.days) {
+                console.error('❌ Error: Cannot specify both --expiry and --days options');
+                process.exit(1);
+            }
+
+            // Prepare optional metadata
+            const metadata = {};
+            if (options.ship) metadata.shipName = options.ship;
+            if (options.notes) metadata.notes = options.notes;
+
+            // Generate license
+            let result;
+            if (options.days) {
+                console.log(`🔄 Generating license for ${options.days} days...`);
+                result = generator.generateLicenseWithDays(options.machineId, options.days, metadata);
+            } else {
+                console.log(`🔄 Generating license until ${options.expiry}...`);
+                result = generator.generateLicense(options.machineId, options.expiry, metadata);
+            }
+
+            // Display results
+            console.log('\n✅ License Generated Successfully!\n');
+            console.log('═'.repeat(60));
+            console.log(`📋 Machine ID:     ${result.machineId}`);
+            console.log(`📅 Expiry Date:    ${result.expiry}`);
+            console.log(`🔑 License Code:   ${result.licenseCode}`);
+            console.log('═'.repeat(60));
+            
+            if (result.shipName) {
+                console.log(`🚢 Ship Name:      ${result.shipName}`);
+            }
+            
+            if (result.notes) {
+                console.log(`📝 Notes:          ${result.notes}`);
+            }
+            
+            console.log(`⏰ Generated:      ${new Date(result.generatedAt).toLocaleString()}`);
+            console.log('═'.repeat(60));
+            
+            if (options.verbose) {
+                console.log('\n🔧 Verbose Information:');
+                console.log(`   Expiry Formatted: ${result.expiryFormatted}`);
+                console.log(`   Signature:        ${result.signature}`);
+                console.log(`   Output saved to:  ${path.join(generator.outputDir)}`);
+            }
+            
+            console.log('\n📧 Send this license code to the ship officer:');
+            console.log(`   ${result.licenseCode}\n`);
+            
+        } catch (error) {
+            console.error(`\n❌ License Generation Failed:`);
+            console.error(`   ${error.message}\n`);
+            process.exit(1);
+        }
+    });
+
+// Parse command line arguments
+program.parse(process.argv);
+
+// Show help if no arguments provided
+if (process.argv.length === 2) {
+    program.help();
+}

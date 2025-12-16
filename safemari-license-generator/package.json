@@ -1,0 +1,46 @@
+{
+  "name": "safemari-license-generator",
+  "version": "1.0.0",
+  "description": "SafeMari Cargo Tools License Generator - Private HMAC signing for machine-bound licenses",
+  "main": "generator/main.js",
+  "bin": {
+    "safemari-gen": "./cli/safemari-gen"
+  },
+  "scripts": {
+    "start": "node cli/safemari-gen",
+    "ui": "start ui/index.html",
+    "install-cli": "npm link",
+    "test-license": "node cli/safemari-gen --machine-id 4F2E9A88B1C7 --days 90",
+    "generate-secret": "node utils/generate-secret.js"
+  },
+  "keywords": [
+    "safemari",
+    "cargo",
+    "license",
+    "hmac",
+    "maritime",
+    "generator"
+  ],
+  "author": "SafeMari License Authority",
+  "license": "PRIVATE",
+  "private": true,
+  "os": [
+    "darwin",
+    "win32"
+  ],
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "dependencies": {
+    "commander": "^12.0.0"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0"
+  },
+  "files": [
+    "generator/**/*",
+    "cli/**/*",
+    "utils/**/*",
+    "README.md"
+  ]
+}

@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>CT Reefer – Stowage Sorter</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --navy:#001f3f;--navy-light:#083563;--accent:#0074D9;
+    --accent-soft:#e6f2ff;--ok:#2ECC40;--warn:#FF4136;--bg:#f5f7fb;
+  }
+  *{box-sizing:border-box;}
+  body{font-family:-apple-system,system-ui,"Segoe UI",sans-serif;margin:0;background:var(--bg);color:#111;}
+  header{background:var(--navy);color:#fff;padding:16px 24px;}
+  header h1{margin:0;font-size:20px;}
+  header p{margin:4px 0 0;font-size:13px;opacity:.8;}
+  main{max-width:1100px;margin:0 auto;padding:20px 16px 40px;}
+  .panel{background:#fff;border-radius:10px;box-shadow:0 2px 6px rgba(0,0,0,.08);padding:16px 20px;margin-bottom:16px;}
+  h2{font-size:17px;margin:0 0 8px;color:var(--navy);}
+  h3{font-size:15px;margin:12px 0 6px;color:var(--navy-light);}
+  .cols{display:flex;flex-wrap:wrap;gap:16px;}
+  .col{flex:1 1 320px;}
+  .drop-zone{border:2px dashed #aac2df;background:#f9fbff;border-radius:8px;padding:16px;text-align:center;font-size:13px;color:#334;cursor:pointer;transition:.15s;}
+  .drop-zone.hover{background:var(--accent-soft);border-color:var(--accent);transform:scale(1.01);}
+  .file-info{font-size:12px;color:#333;margin-top:6px;}
+  input[type=file]{margin-top:8px;font-size:12px;}
+  button{padding:9px 18px;border-radius:6px;border:none;font-size:14px;font-weight:600;cursor:pointer;background:var(--accent);color:#fff;margin-right:8px;box-shadow:0 2px 4px rgba(0,0,0,.15);transition:.15s;}
+  button:hover{background:#005bb3;transform:translateY(-1px);box-shadow:0 3px 6px rgba(0,0,0,.18);}
+  button:disabled{background:#b0c7e0;cursor:default;box-shadow:none;transform:none;}
+  #result{margin-top:10px;font-size:14px;}
+  .summary-line{margin:2px 0;}
+  .ok{color:var(--ok);font-weight:600;}
+  .warn{color:var(--warn);font-weight:600;}
+  pre{background:#fafbff;border-radius:6px;border:1px solid #dde4f3;padding:10px;font-family:"SF Mono",Menlo,monospace;font-size:12px;max-height:260px;overflow:auto;margin:8px 0 0;}
+  .section-title{margin-top:12px;font-weight:600;color:var(--navy-light);font-size:13px;}
+</style>
+</head>
+<body>
+<header>
+  <h1>📦 CT Reefer – Stowage Sorter</h1>
+  <p>Drop FULL reefer list + CT monitoring sheet. Keeps CT layout, but reorders containers by Bay–Row–Tier and updates stowage.</p>
+</header>
+
+<main>
+  <section class="panel">
+    <h2>1. Load Files</h2>
+    <p style="font-size:13px;margin-bottom:10px;">
+      <b>FULL REEFER LIST:</b> any Excel with <i>Stowage</i> + <i>Cont. ID</i> headers (e.g. FINAL REEFER LIST).<br>
+      <b>CT LIST:</b> your CT monitoring sheet (any file name).
+    </p>
+    <div class="cols">
+      <div class="col">
+        <h3>📥 FULL REEFER LIST (with stowage)</h3>
+        <div id="dropFull" class="drop-zone">
+          Drop FULL reefer Excel here<br>
+          <span style="font-size:11px;opacity:.8;">must contain Stowage + Cont. ID columns</span>
+        </div>
+        <input type="file" id="fileFull" accept=".xlsx,.xls">
+        <div class="file-info" id="fullName"></div>
+      </div>
+      <div class="col">
+        <h3>📥 CT LIST (CT monitoring sheet)</h3>
+        <div id="dropCt" class="drop-zone">
+          Drop CT Excel here<br>
+          <span style="font-size:11px;opacity:.8;">your multi-row CT template</span>
+        </div>
+        <input type="file" id="fileCt" accept=".xlsx,.xls">
+        <div class="file-info" id="ctName"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>2. Sort by Stowage &amp; Export</h2>
+    <p style="font-size:13px;margin-bottom:8px;">
+      Click <b>SORT CT BY BBRRTT</b> to:
+      <br>• Map each CT container to its stowage from FULL list
+      <br>• Write stowage into the CT block (replacing or inserting)
+      <br>• Reorder whole blocks (all rows per container) by Bay–Row–Tier
+    </p>
+    <button id="runBtn" onclick="runMapping()">SORT CT BY BBRRTT</button>
+    <button id="downloadBtn" onclick="downloadExcel()" disabled>Download Sorted CT Excel</button>
+    <div id="result" style="display:none;"></div>
+  </section>
+</main>
+
+<script>
+let fullWb = null;
+let ctWb = null;
+let sortedCtRows = null;   // final AOArray for CT sheet
+
+// -------- Drag & Drop wiring --------
+function setupDropZone(id, cb){
+  const z = document.getElementById(id);
+  z.addEventListener("dragover", e => { e.preventDefault(); z.classList.add("hover"); });
+  z.addEventListener("dragleave", () => z.classList.remove("hover"));
+  z.addEventListener("drop", e => {
+    e.preventDefault();
+    z.classList.remove("hover");
+    const f = e.dataTransfer.files[0];
+    if(f) cb(f);
+  });
+}
+setupDropZone("dropFull", handleFullFile);
+setupDropZone("dropCt", handleCtFile);
+
+document.getElementById("fileFull").addEventListener("change", e => {
+  if(e.target.files[0]) handleFullFile(e.target.files[0]);
+});
+document.getElementById("fileCt").addEventListener("change", e => {
+  if(e.target.files[0]) handleCtFile(e.target.files[0]);
+});
+
+function handleFullFile(file){
+  document.getElementById("fullName").textContent = "Loaded FULL list: " + file.name;
+  readExcel(file, wb => fullWb = wb);
+}
+function handleCtFile(file){
+  document.getElementById("ctName").textContent = "Loaded CT list: " + file.name;
+  readExcel(file, wb => ctWb = wb);
+}
+
+function readExcel(file, cb){
+  const r = new FileReader();
+  r.onload = e => {
+    const data = new Uint8Array(e.target.result);
+    const wb = XLSX.read(data, {type:"array"});
+    cb(wb);
+  };
+  r.readAsArrayBuffer(file);
+}
+
+// -------- Helpers --------
+function detectContainerId(cell){
+  if(cell == null) return null;
+  const s = cell.toString().trim().toUpperCase();
+  return /^[A-Z]{4}\d{7}$/.test(s) ? s : null;
+}
+
+// FULL list: build containerID -> stowage string map using headers
+function buildStowageMapFromFull(workbook){
+  const map = {};
+  workbook.SheetNames.forEach(sheetName => {
+    const ws = workbook.Sheets[sheetName];
+    if(!ws) return;
+    const rows = XLSX.utils.sheet_to_json(ws, {header:1,raw:true});
+    if(!rows || !rows.length) return;
+
+    let headerRow = -1;
+    let stowIdx = -1;
+    let idIdx = -1;
+    const maxHeaderScan = Math.min(15, rows.length);
+
+    for(let r=0; r<maxHeaderScan; r++){
+      const row = rows[r] || [];
+      for(let c=0; c<row.length; c++){
+        const val = (row[c] == null ? "" : row[c].toString()).toUpperCase();
+        if(val.indexOf("STOWAGE") !== -1) stowIdx = c;
+        if(val.indexOf("CONT") !== -1 && val.indexOf("ID") !== -1) idIdx = c;
+      }
+      if(stowIdx !== -1 && idIdx !== -1){
+        headerRow = r;
+        break;
+      }
+    }
+    if(headerRow === -1 || stowIdx === -1 || idIdx === -1) return;
+
+    for(let r = headerRow + 1; r < rows.length; r++){
+      const row = rows[r] || [];
+      const id = detectContainerId(row[idIdx]);
+      if(!id) continue;
+      const stowVal = row[stowIdx];
+      if(stowVal == null || stowVal === "") continue;
+      if(!(id in map)){
+        map[id] = stowVal.toString().trim();
+      }
+    }
+  });
+  return map;
+}
+
+// Normalize stowage to 6-digit key BBRRTT for sorting
+function brtKeyFromStowage(stow){
+  if(stow == null) return "ZZZZZZ";     // missing -> goes to bottom
+  let s = stow.toString();
+  let digits = s.replace(/[^\d]/g, "");
+  if(digits.length > 6) digits = digits.slice(0,6);
+  if(digits.length < 6) digits = digits.padStart(6,"0");
+  return digits;
+}
+
+// Format stowage as XX.XX.XX for display in CT sheet
+function prettyStow(stow){
+  if(stow == null) return "";
+  let digits = stow.toString().replace(/[^\d]/g,"");
+  if(digits.length < 6) digits = digits.padStart(6, "0");
+  return digits;   // return 100876 style (no dots)
+}
+
+// Parse CT sheet into headerRows, blocks, tailRows
+function parseCtBlocks(workbook){
+  const sheetName = workbook.SheetNames[0]; // first sheet
+  const ws = workbook.Sheets[sheetName];
+  if(!ws) return null;
+  const rows = XLSX.utils.sheet_to_json(ws,{header:1,raw:true});
+  if(!rows || !rows.length) return null;
+
+  let headerRows = [];
+  let blocks = [];
+  let i = 0;
+
+  // header: until first row with ANY container ID
+  while(i < rows.length){
+    const row = rows[i] || [];
+    let hasId = false;
+    for(let c=0;c<row.length;c++){
+      if(detectContainerId(row[c])){
+        hasId = true;
+        break;
+      }
+    }
+    if(hasId) break;
+    headerRows.push(row);
+    i++;
+  }
+
+  // blocks: each container row + following rows until next container row
+  while(i < rows.length){
+    const row = rows[i] || [];
+    let id = null;
+    for(let c=0;c<row.length;c++){
+      const maybe = detectContainerId(row[c]);
+      if(maybe){
+        id = maybe;
+        break;
+      }
+    }
+    if(!id){
+      // no more containers; rest is tail
+      break;
+    }
+    const start = i;
+    i++;
+    while(i < rows.length){
+      const r2 = rows[i] || [];
+      let hasNextId = false;
+      for(let c=0;c<r2.length;c++){
+        if(detectContainerId(r2[c])){
+          hasNextId = true;
+          break;
+        }
+      }
+      if(hasNextId) break;
+      i++;
+    }
+    const end = i;
+    blocks.push({id:id,start:start,end:end});
+  }
+
+  const tailRows = rows.slice(i);
+  return {sheetName:sheetName,rows:rows,headerRows:headerRows,blocks:blocks,tailRows:tailRows};
+}
+
+// Update the stowage cell inside a CT block
+// 1) If an existing XX.XX.XX / XX XX XX is found, overwrite it
+// 2) Else, put it just before "(5) PROBE 3"
+// 3) Else, drop it into the first empty cell in the block
+function overwriteCtBlockStowage(rows, block, stow){
+  if(!stow) return;
+
+  const display = prettyStow(stow);
+  const start = block.start;
+  const end = block.end;
+  const stowPattern = /^\d{2}[\s\.]\d{2}[\s\.]\d{2}$/;
+
+  // 1) Try to overwrite an existing stowage-looking cell
+  for(let r = start; r < end; r++){
+    const row = rows[r] || [];
+    for(let c = 0; c < row.length; c++){
+      const val = row[c];
+      if(val == null) continue;
+      const s = val.toString().trim();
+      if(stowPattern.test(s)){
+        row[c] = display;
+        return;
+      }
+    }
+  }
+
+  // 2) Try to place it just before "(5) PROBE 3"
+  for(let r = start; r < end; r++){
+    const row = rows[r] || [];
+    for(let c = 0; c < row.length; c++){
+      const val = row[c];
+      if(val == null) continue;
+      const s = val.toString().trim().toUpperCase().replace(/\s+/g," ");
+      if(s === "(5) PROBE 3"){
+        const targetCol = c > 0 ? c - 1 : c + 1;
+        if(row[targetCol] === null || row[targetCol] === undefined || row[targetCol].toString().trim() === ""){
+          row[targetCol] = display;
+        } else {
+          // even if something is there but not a stowage, we still override
+          row[targetCol] = display;
+        }
+        return;
+      }
+    }
+  }
+
+  // 3) Fallback: first empty cell in this block (limit to first ~8 rows to avoid footer)
+  for(let r = start; r < Math.min(end, start + 8); r++){
+    const row = rows[r] || [];
+    for(let c = 0; c < row.length; c++){
+      const val = row[c];
+      if(val === null || val === undefined || val.toString().trim() === ""){
+        row[c] = display;
+        return;
+      }
+    }
+  }
+}
+
+// -------- Main mapping & sorting --------
+function runMapping(){
+  if(!fullWb || !ctWb){
+    alert("Please load both FULL REEFER LIST and CT LIST first.");
+    return;
+  }
+
+  const runBtn = document.getElementById("runBtn");
+  const downloadBtn = document.getElementById("downloadBtn");
+  const resultDiv = document.getElementById("result");
+  runBtn.disabled = true;
+  downloadBtn.disabled = true;
+  resultDiv.style.display = "block";
+  resultDiv.textContent = "Building stowage map and parsing CT blocks...";
+
+  setTimeout(function(){
+    const stowMap = buildStowageMapFromFull(fullWb);
+    const parsed = parseCtBlocks(ctWb);
+
+    if(!parsed){
+      alert("Could not parse CT sheet structure.");
+      runBtn.disabled = false;
+      return;
+    }
+
+    const rows = parsed.rows;
+    const headerRows = parsed.headerRows;
+    const blocks = parsed.blocks;
+    const tailRows = parsed.tailRows;
+
+    let matched = 0;
+    let missing = 0;
+
+    // attach sort key & overwrite stow cell for each block
+    const blocksWithKey = blocks.map(function(b){
+      const stow = stowMap[b.id] || null;
+      if(stow) matched++; else missing++;
+      overwriteCtBlockStowage(rows, b, stow);
+      const key = brtKeyFromStowage(stow);
+      return {
+        id: b.id,
+        start: b.start,
+        end: b.end,
+        key: key,
+        stow: stow
+      };
+    });
+
+    // sort blocks by BBRRTT key
+    blocksWithKey.sort(function(a,b){
+      if(a.key < b.key) return -1;
+      if(a.key > b.key) return 1;
+      return 0;
+    });
+
+    // rebuild rows: header + sorted blocks + tail
+    const newRows = [];
+    for(let r=0;r<headerRows.length;r++) newRows.push(headerRows[r]);
+
+    blocksWithKey.forEach(function(b){
+      for(let r=b.start; r<b.end; r++){
+        newRows.push(rows[r]);
+      }
+    });
+
+    for(let r=0;r<tailRows.length;r++) newRows.push(tailRows[r]);
+
+    sortedCtRows = newRows;
+
+    // summary
+    let html = "";
+    html += '<div class="summary-line"><strong>Total CT containers detected:</strong> ' + blocks.length + '</div>';
+    html += '<div class="summary-line"><strong>Matched with stowage in FULL list:</strong> <span class="ok">' + matched + '</span></div>';
+    html += '<div class="summary-line"><strong>Not found in FULL list:</strong> <span class="' + (missing ? 'warn':'ok') + '">' + missing + '</span></div>';
+
+    if(blocksWithKey.length){
+      const maxPreview = Math.min(10, blocksWithKey.length);
+      html += '<div class="section-title">Preview (first ' + maxPreview + ' containers after sort):</div>';
+      let txt = "ID           Key(BB RR TT)   Stowage from FULL\n";
+      txt += "----------------------------------------------\n";
+      for(let i=0;i<maxPreview;i++){
+        const b = blocksWithKey[i];
+        const key = b.key;
+        const digits = key.replace(/[^0-9]/g,"");
+        const bay  = digits.slice(0,2);
+        const row  = digits.slice(2,4);
+        const tier = digits.slice(4,6);
+        const st   = b.stow ? prettyStow(b.stow) : "";
+        txt += b.id + "   " + bay + " " + row + " " + tier + "      " + st + "\n";
+      }
+      html += '<pre>' + txt + '</pre>';
+    }
+
+    resultDiv.style.display = "block";
+    resultDiv.innerHTML = html;
+
+    runBtn.disabled = false;
+    downloadBtn.disabled = !sortedCtRows || !sortedCtRows.length;
+  },40);
+}
+
+// -------- Excel export (CT layout preserved, sorted) --------
+function downloadExcel(){
+  if(!sortedCtRows || !sortedCtRows.length){
+    alert("No sorted CT sheet to export yet.");
+    return;
+  }
+  const ws = XLSX.utils.aoa_to_sheet(sortedCtRows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "CT_Sorted");
+  XLSX.writeFile(wb, "CT_Sorted_By_Stowage.xlsx");
+}
+</script>
+</body>
+</html>

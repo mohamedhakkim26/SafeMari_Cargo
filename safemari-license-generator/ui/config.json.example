@@ -1,0 +1,29 @@
+{
+  "description": "SafeMari License Generator Configuration",
+  "version": "1.0.0",
+  "encryption": {
+    "algorithm": "XOR with key derivation",
+    "keyLength": 256,
+    "note": "Simple encryption for demo - use stronger crypto in production"
+  },
+  "defaultSettings": {
+    "maxLicenseDays": 3650,
+    "defaultDuration": 90,
+    "machineIdFormat": "12-16 hex characters",
+    "licenseFormat": "LC-{MACHINE_ID}-{YYYYMMDD}-{SIGNATURE}"
+  },
+  "security": {
+    "masterPasswordRequired": true,
+    "configEncrypted": true,
+    "localStorageOnly": true,
+    "noNetworkAccess": true
+  },
+  "usage": {
+    "step1": "Enter master password to unlock generator",
+    "step2": "Enter target machine ID (from cargo tools app)",
+    "step3": "Set license duration (days or specific date)",
+    "step4": "Add optional metadata (ship name, notes)",
+    "step5": "Generate and copy license code",
+    "step6": "Provide license code to end user"
+  }
+}

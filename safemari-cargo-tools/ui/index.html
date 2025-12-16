@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeMari Cargo Tools</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
+</head>
+<body>
+    <!-- License Activation Modal -->
+    <div id="licenseModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>License Activation Required</h2>
+            </div>
+            <div class="modal-body">
+                <div id="licenseContent">
+                    <div class="license-section">
+                        <h3>Machine ID</h3>
+                        <div class="machine-id-container">
+                            <code id="machineId">Loading...</code>
+                            <button id="copyMachineId" class="btn-small">Copy</button>
+                        </div>
+                        <p class="help-text">Send this Machine ID to your license provider to receive your activation code.</p>
+                    </div>
+                    
+                    <div class="license-section">
+                        <h3>Enter License Code</h3>
+                        <div class="input-group">
+                            <input type="text" id="licenseCodeInput" placeholder="LC-XXXXXXXX-XXXXXXXX-XXXXXXXXXXXX" maxlength="50">
+                            <button id="activateLicense" class="btn-primary">Activate</button>
+                        </div>
+                        <div id="licenseError" class="error-message" style="display: none;"></div>
+                        <div id="licenseSuccess" class="success-message" style="display: none;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application Container -->
+    <div id="appContainer" class="app-container" style="display: none;">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <img src="assets/logo.png" alt="SafeMari" class="logo" onerror="this.style.display='none'">
+                <h1>SafeMari Cargo Tools</h1>
+            </div>
+            <div class="header-right">
+                <div class="license-status">
+                    <span id="licenseStatus" class="license-indicator">Licensed</span>
+                    <span id="licenseExpiry" class="license-expiry"></span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <div class="main-content">
+            <!-- Sidebar Navigation -->
+            <nav class="sidebar">
+                <div class="nav-section">
+                    <h3>Reefers</h3>
+                    <ul class="nav-list">
+                        <li><a href="#" data-view="reefer-temp" class="nav-link">Temp Checker</a></li>
+                        <li><a href="#" data-view="ct-stowage" class="nav-link">CT Stowage</a></li>
+                    </ul>
+                </div>
+
+                <div class="nav-section">
+                    <h3>DG Cargo</h3>
+                    <ul class="nav-list">
+                        <li><a href="#" data-view="dg-checker" class="nav-link">DG Checker</a></li>
+                    </ul>
+                </div>
+
+                <div class="nav-section">
+                    <h3>Tools</h3>
+                    <ul class="nav-list">
+                        <li><a href="#" data-view="list-compare" class="nav-link">List Compare</a></li>
+                    </ul>
+                </div>
+
+                <div class="nav-section">
+                    <h3>Logs</h3>
+                    <ul class="nav-list">
+                        <li><a href="#" data-view="logs" class="nav-link">View / Export</a></li>
+                    </ul>
+                </div>
+
+                <div class="nav-section">
+                    <h3>Settings</h3>
+                    <ul class="nav-list">
+                        <li><a href="#" data-view="settings" class="nav-link">Preferences</a></li>
+                        <li><a href="#" data-view="license-info" class="nav-link">License Info</a></li>
+                    </ul>
+                </div>
+
+                <div class="nav-section">
+                    <h3>About</h3>
+                    <ul class="nav-list">
+                        <li><a href="#" data-view="about" class="nav-link">App Info</a></li>
+                    </ul>
+                </div>
+            </nav>
+
+            <!-- Content Area -->
+            <main class="content-area">
+                <div id="viewContainer" class="view-container">
+                    <!-- Dynamic content will be loaded here -->
+                    <div class="welcome-screen">
+                        <h2>Welcome to SafeMari Cargo Tools</h2>
+                        <p>Select a tool from the sidebar to get started.</p>
+                        
+                        <div class="feature-cards">
+                            <div class="feature-card" data-view="reefer-temp">
+                                <h3>Reefer Temperature Checker</h3>
+                                <p>Compare set temperatures with manifest temperatures</p>
+                            </div>
+                            <div class="feature-card" data-view="ct-stowage">
+                                <h3>CT Stowage Sorter</h3>
+                                <p>Sort reefer containers into CT monitoring blocks</p>
+                            </div>
+                            <div class="feature-card" data-view="dg-checker">
+                                <h3>DG Manifest Checker</h3>
+                                <p>Validate dangerous goods between PDF and Excel</p>
+                            </div>
+                            <div class="feature-card" data-view="list-compare">
+                                <h3>List Reconciliation</h3>
+                                <p>Compare two container lists for differences</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-left">
+                <span id="appVersion">v1.0.0</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Loading Screen -->
+    <div id="loadingScreen" class="loading-screen">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <h2>Loading SafeMari Cargo Tools</h2>
+            <p>Checking license status...</p>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="router.js"></script>
+    <script src="views/license.js"></script>
+    <script>
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                console.log('DOM Content Loaded');
+                
+                // Check if Router class is available
+                if (typeof Router === 'undefined') {
+                    console.error('Router class is not defined - router.js may have failed to load');
+                    showError('Failed to initialize application: Router is not defined');
+                    return;
+                }
+                
+                console.log('Router class is available, initializing...');
+                
+                // Initialize license checker
+                await initializeLicenseCheck();
+                
+                // Initialize router
+                window.router = new Router();
+                console.log('Router initialized successfully');
+                
+                // Make download functions globally available
+                window.downloadReeferReport = () => {
+                    if (window.router) {
+                        window.router.downloadReeferReportGlobal();
+                    }
+                };
+                
+                window.downloadCTReport = () => {
+                    if (window.router) {
+                        window.router.downloadCTReportGlobal();
+                    }
+                };
+                
+                window.exportLogs = () => {
+                    if (window.router) {
+                        window.router.exportLogsData();
+                    }
+                };
+                
+                // Get app info
+                const appInfo = await window.safeMariAPI.getAppInfo();
+                if (appInfo.success) {
+                    document.getElementById('appVersion').textContent = `v${appInfo.version}`;
+                }
+                
+                console.log('Application initialized successfully');
+                
+            } catch (error) {
+                console.error('Failed to initialize application:', error);
+                showError('Failed to initialize application: ' + error.message);
+            }
+        });
+
+        // Utility function to show errors
+        function showError(message) {
+            console.error(message);
+            // You can implement a proper error display here
+            alert(message);
+        }
+    </script>
+</body>
+</html>

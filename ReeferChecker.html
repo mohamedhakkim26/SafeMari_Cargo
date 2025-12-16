@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Reefer Checker – Manifest vs Set Temperature (v3)</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+    :root {
+        --navy: #001f3f;
+        --navy-light: #083563;
+        --accent: #0074D9;
+        --accent-soft: #e6f2ff;
+        --ok: #2ECC40;
+        --warn: #FF4136;
+        --bg: #f5f7fb;
+    }
+    * { box-sizing: border-box; }
+    body {
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        margin: 0;
+        background: var(--bg);
+        color: #111;
+    }
+    header {
+        background: var(--navy);
+        color: white;
+        padding: 16px 24px;
+    }
+    header h1 {
+        margin: 0;
+        font-size: 20px;
+    }
+    header p {
+        margin: 4px 0 0;
+        font-size: 13px;
+        opacity: 0.8;
+    }
+    main {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px 16px 40px;
+    }
+    .panel {
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+        padding: 16px 20px;
+        margin-bottom: 16px;
+    }
+    h2 {
+        font-size: 17px;
+        margin: 0 0 8px;
+        color: var(--navy);
+    }
+    h3 {
+        font-size: 15px;
+        margin: 12px 0 6px;
+        color: var(--navy-light);
+    }
+    .cols {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+    .col {
+        flex: 1 1 320px;
+    }
+    .drop-zone {
+        border: 2px dashed #aac2df;
+        background: #f9fbff;
+        border-radius: 8px;
+        padding: 16px;
+        text-align: center;
+        cursor: pointer;
+        font-size: 13px;
+        color: #334;
+        transition: background 0.2s, border-color 0.2s, transform 0.1s;
+    }
+    .drop-zone.hover {
+        background: var(--accent-soft);
+        border-color: var(--accent);
+        transform: scale(1.01);
+    }
+    .file-info {
+        font-size: 12px;
+        color: #333;
+        margin-top: 6px;
+    }
+    input[type="file"] {
+        margin-top: 8px;
+        font-size: 12px;
+    }
+    button {
+        padding: 9px 18px;
+        border-radius: 6px;
+        border: none;
+        font-size: 14px;
+        cursor: pointer;
+        background: var(--accent);
+        color: white;
+        font-weight: 600;
+        margin-right: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+    }
+    button:hover {
+        background: #005bb3;
+        transform: translateY(-1px);
+        box-shadow: 0 3px 6px rgba(0,0,0,0.18);
+    }
+    button:disabled {
+        background: #b0c7e0;
+        cursor: default;
+        box-shadow: none;
+        transform: none;
+    }
+    #result {
+        margin-top: 10px;
+        font-size: 14px;
+    }
+    .summary-line {
+        margin: 2px 0;
+    }
+    .ok { color: var(--ok); font-weight: 600; }
+    .warn { color: var(--warn); font-weight: 600; }
+    pre {
+        background: #fafbff;
+        border-radius: 6px;
+        border: 1px solid #dde4f3;
+        padding: 10px;
+        font-family: "SF Mono", Menlo, Monaco, Consolas, monospace;
+        font-size: 12px;
+        max-height: 260px;
+        overflow: auto;
+        margin: 8px 0 0;
+    }
+    .section-title {
+        margin-top: 12px;
+        font-weight: 600;
+        color: var(--navy-light);
+        font-size: 13px;
+    }
+    .diag {
+        font-size: 12px;
+        color: #555;
+        margin-top: 8px;
+        opacity: 0.9;
+    }
+</style>
+</head>
+
+<body>
+<header>
+    <h1>❄️ Reefer Checker – Manifest vs Set Temperature (v3)</h1>
+    <p>Drop any CHECK + MANIFEST Excel files. The engine auto-detects ID and temperature columns by pattern.</p>
+</header>
+
+<main>
+    <section class="panel">
+        <h2>1. Load Files</h2>
+        <p style="font-size:13px;margin-bottom:10px;">
+            CHECK file: port reefer list with set temps (e.g. <strong>PAITA ALL REFERS.xlsx</strong>).<br>
+            MANIFEST file: full Reefer &amp; Heated manifest (multi-sheet).
+        </p>
+        <div class="cols">
+            <div class="col">
+                <h3>📥 CHECK FILE (Set Temps)</h3>
+                <div id="dropCheck" class="drop-zone">
+                    Drop CHECK Excel file here<br>
+                    <span style="font-size:11px;opacity:0.8;">(e.g. PAITA ALL REFERS.xlsx)</span>
+                </div>
+                <input type="file" id="fileCheck" accept=".xlsx,.xls">
+                <div class="file-info" id="checkName"></div>
+            </div>
+            <div class="col">
+                <h3>📥 MANIFEST FILE (Manifest Temps)</h3>
+                <div id="dropManifest" class="drop-zone">
+                    Drop MANIFEST Excel file here<br>
+                    <span style="font-size:11px;opacity:0.8;">(e.g. Reefer and Heated Manifest ...)</span>
+                </div>
+                <input type="file" id="fileManifest" accept=".xlsx,.xls">
+                <div class="file-info" id="manifestName"></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="panel">
+        <h2>2. Run Comparison</h2>
+        <p style="font-size:13px;margin-bottom:8px;">
+            Click <strong>COMPARE</strong> once both files are loaded. The tool will auto-detect ID &amp; temperature columns,
+            then compare setpoints vs manifest temps.
+        </p>
+        <button id="compareBtn" onclick="compareFiles()">COMPARE</button>
+        <button id="downloadBtn" onclick="downloadExcel()" disabled>Download Excel Report (mismatches only)</button>
+
+        <div id="result" style="display:none;"></div>
+    </section>
+</main>
+
+<script>
+let checkWb = null;
+let manifestWb = null;
+let finalResults = null;
+
+// ========= DRAG & DROP WIRING =========
+function setupDropZone(id, callback) {
+    const zone = document.getElementById(id);
+
+    zone.addEventListener("dragover", e => {
+        e.preventDefault();
+        zone.classList.add("hover");
+    });
+
+    zone.addEventListener("dragleave", () => zone.classList.remove("hover"));
+
+    zone.addEventListener("drop", e => {
+        e.preventDefault();
+        zone.classList.remove("hover");
+        const file = e.dataTransfer.files[0];
+        if (file) callback(file);
+    });
+}
+
+setupDropZone("dropCheck", file => handleCheckFile(file));
+setupDropZone("dropManifest", file => handleManifestFile(file));
+
+document.getElementById("fileCheck").addEventListener("change", e => {
+    if (e.target.files[0]) handleCheckFile(e.target.files[0]);
+});
+document.getElementById("fileManifest").addEventListener("change", e => {
+    if (e.target.files[0]) handleManifestFile(e.target.files[0]);
+});
+
+function handleCheckFile(file) {
+    document.getElementById("checkName").textContent =
+        "Loaded CHECK file: " + file.name;
+    readExcel(file, wb => { checkWb = wb; });
+}
+
+function handleManifestFile(file) {
+    document.getElementById("manifestName").textContent =
+        "Loaded MANIFEST file: " + file.name;
+    readExcel(file, wb => { manifestWb = wb; });
+}
+
+function readExcel(file, callback) {
+    const reader = new FileReader();
+    reader.onload = e => {
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, { type: "array" });
+        callback(wb);
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+// ========= PATTERN HELPERS =========
+function detectContainerId(cell) {
+    if (cell === undefined || cell === null) return null;
+    const s = cell.toString().trim().toUpperCase();
+    const re = /^[A-Z]{4}\d{7}$/;
+    return re.test(s) ? s : null;
+}
+
+// Returns numeric temperature if cell looks like a temp, otherwise null
+function detectTempNumber(cell) {
+    if (cell === undefined || cell === null) return null;
+    let s = cell.toString().trim().toUpperCase();
+    const match = s.match(/-?\d+(\.\d+)?/);
+    if (!match) return null;
+    const n = parseFloat(match[0]);
+    if (isNaN(n)) return null;
+    if (n < -50 || n > 60) return null;
+    return n;
+}
+
+// Returns a "temp-likeness" score for a single cell
+function tempScoreForCell(cell) {
+    if (cell === undefined || cell === null) return 0;
+    let s = cell.toString().trim().toUpperCase();
+    const match = s.match(/-?\d+(\.\d+)?/);
+    if (!match) return 0;
+    const n = parseFloat(match[0]);
+    if (isNaN(n)) return 0;
+    if (n < -50 || n > 60) return 0;
+
+    let score = 1; // base
+    if (s.includes("C") || s.includes("DEG") || s.includes("TEMP")) score += 1;
+    if (match[0].includes(".")) score += 0.5; // decimals are common for reefer temps
+    return score;
+}
+
+// Analyze one sheet (rows array) and auto-pick ID + Temp columns
+function analyzeSheetColumns(rows) {
+    if (!rows || rows.length === 0) return null;
+
+    const maxScanRows = Math.min(rows.length, 300);
+    let maxCols = 0;
+    for (let r = 0; r < maxScanRows; r++) {
+        const row = rows[r] || [];
+        if (row.length > maxCols) maxCols = row.length;
+    }
+
+    const profiles = [];
+    for (let c = 0; c < maxCols; c++) {
+        profiles[c] = { nonEmpty: 0, idCount: 0, tempPoints: 0 };
+    }
+
+    for (let r = 0; r < maxScanRows; r++) {
+        const row = rows[r] || [];
+        for (let c = 0; c < maxCols; c++) {
+            const cell = row[c];
+            if (cell === undefined || cell === null || cell === "") continue;
+            const p = profiles[c];
+            p.nonEmpty++;
+
+            if (detectContainerId(cell)) {
+                p.idCount++;
+            }
+            p.tempPoints += tempScoreForCell(cell);
+        }
+    }
+
+    // Pick best ID + temp columns with relaxed thresholds (to include small sheets)
+    let bestIdCol = -1;
+    let bestIdScore = 0;
+    let bestTempCol = -1;
+    let bestTempScore = 0;
+
+    for (let c = 0; c < maxCols; c++) {
+        const p = profiles[c];
+        if (p.nonEmpty === 0) continue;
+
+        const idScore = p.idCount / p.nonEmpty;
+        const tempScore = p.tempPoints / p.nonEmpty;
+
+        // Container ID column: allow even small sheets (>=1 ID)
+        if (idScore > bestIdScore && p.idCount >= 1) {
+            bestIdScore = idScore;
+            bestIdCol = c;
+        }
+
+        // Temp column: allow few temp cells (>=2 temp points)
+        if (tempScore > bestTempScore && p.tempPoints >= 2) {
+            bestTempScore = tempScore;
+            bestTempCol = c;
+        }
+    }
+
+    // Minimal thresholds so we don't pick pure noise
+    if (bestIdCol === -1 || bestIdScore < 0.05) {
+        return null; // no good ID column
+    }
+    if (bestTempCol === -1 || bestTempScore < 0.3) {
+        return null; // no good temp column
+    }
+
+    return {
+        idCol: bestIdCol,
+        tempCol: bestTempCol,
+        idScore: bestIdScore,
+        tempScore: bestTempScore
+    };
+}
+
+// Extract ID -> temp map from workbook, using auto column detection
+function extractIdTempMapAuto(workbook) {
+    const map = {};
+
+    workbook.SheetNames.forEach(sheetName => {
+        const ws = workbook.Sheets[sheetName];
+        if (!ws) return;
+
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true });
+        if (!rows || rows.length === 0) return;
+
+        const colsInfo = analyzeSheetColumns(rows);
+        if (!colsInfo) return;
+
+        const { idCol, tempCol } = colsInfo;
+
+        // Find first data row (where an ID appears in idCol)
+        let firstDataRow = 0;
+        for (let r = 0; r < rows.length; r++) {
+            const row = rows[r] || [];
+            if (detectContainerId(row[idCol])) {
+                firstDataRow = r;
+                break;
+            }
+        }
+
+        for (let r = firstDataRow; r < rows.length; r++) {
+            const row = rows[r] || [];
+            const rawId = row[idCol];
+            const id = detectContainerId(rawId);
+            if (!id) continue;
+
+            const cellTemp = row[tempCol];
+            const val = detectTempNumber(cellTemp);
+            if (val === null) continue;
+
+            if (!(id in map)) {
+                map[id] = val;
+            }
+        }
+    });
+
+    return map;
+}
+
+// ========= COMPARISON & UI =========
+function compareFiles() {
+    if (!checkWb || !manifestWb) {
+        alert("Please load both CHECK and MANIFEST Excel files first.");
+        return;
+    }
+
+    const compareBtn = document.getElementById("compareBtn");
+    const downloadBtn = document.getElementById("downloadBtn");
+    const resultDiv = document.getElementById("result");
+
+    compareBtn.disabled = true;
+    downloadBtn.disabled = true;
+    resultDiv.style.display = "block";
+    resultDiv.innerHTML = "Running comparison...";
+
+    setTimeout(() => {
+        const checkMap = extractIdTempMapAuto(checkWb);
+        const manifestMap = extractIdTempMapAuto(manifestWb);
+
+        const checkIds = Object.keys(checkMap || {});
+        const missing = [];
+        const mismatches = [];
+        let found = 0;
+
+        for (const id of checkIds) {
+            const setT = checkMap[id];
+            const manT = manifestMap[id];
+
+            if (manT === undefined) {
+                missing.push(id);
+                continue;
+            }
+            found++;
+
+            const diff = Math.abs(setT - manT);
+            if (diff > 0.1) {
+                mismatches.push({ id, setT, manT, diff });
+            }
+        }
+
+        finalResults = { checkMap, manifestMap, missing, mismatches };
+        renderResults();
+        compareBtn.disabled = false;
+        downloadBtn.disabled = mismatches.length === 0;
+    }, 40);
+}
+
+function renderResults() {
+    if (!finalResults) return;
+    const { checkMap, manifestMap, missing, mismatches } = finalResults;
+    const resultDiv = document.getElementById("result");
+
+    const totalCheck = checkMap ? Object.keys(checkMap).length : 0;
+    const totalManifest = manifestMap ? Object.keys(manifestMap).length : 0;
+    const found = totalCheck - missing.length;
+    const exactMatches = found - mismatches.length;
+
+    let html = "";
+    
+    // Basic stats
+    html += `<div class="summary-line"><strong>Total in CHECK:</strong> ${totalCheck}</div>`;
+    html += `<div class="summary-line"><strong>Detected with temps in MANIFEST:</strong> ${totalManifest}</div>`;
+    html += `<div class="summary-line"><strong>Found in MANIFEST (matching IDs):</strong> <span class="ok">${found}</span></div>`;
+    html += `<div class="summary-line"><strong>Missing (ID not found in MANIFEST):</strong> <span class="${missing.length ? "warn" : "ok"}">${missing.length}</span></div>`;
+    html += `<div class="summary-line"><strong>Temperature mismatches (&gt; 0.1°C):</strong> <span class="${mismatches.length ? "warn" : "ok"}">${mismatches.length}</span></div>`;
+    html += `<div class="diag">${`CHECK IDs w/ temp = ${totalCheck}, MANIFEST IDs w/ temp = ${totalManifest}`}</div>`;
+    
+    // Comprehensive Summary Section - UPDATED
+    html += `<div style="background: #f8f9fa; border-radius: 8px; padding: 16px; margin: 16px 0; border-left: 4px solid var(--accent); display: block !important;">`;
+    html += `<h3 style="margin: 0 0 12px; color: var(--navy); font-size: 16px;">📊 COMPARISON SUMMARY</h3>`;
+    
+    // Input files summary
+    html += `<div style="margin-bottom: 12px;">`;
+    html += `<strong>📄 INPUT FILES:</strong><br>`;
+    html += `&nbsp;&nbsp;• CHECK file containers: ${totalCheck}<br>`;
+    html += `&nbsp;&nbsp;• MANIFEST file containers: ${totalManifest}`;
+    html += `</div>`;
+    
+    // Matching results
+    html += `<div style="margin-bottom: 12px;">`;
+    html += `<strong>🔍 MATCHING RESULTS:</strong><br>`;
+    html += `&nbsp;&nbsp;• Containers found in both files: ${found}<br>`;
+    html += `&nbsp;&nbsp;• Perfect temperature matches: <span class="ok">${exactMatches}</span><br>`;
+    html += `&nbsp;&nbsp;• Temperature mismatches (>0.1°C): <span class="${mismatches.length ? "warn" : "ok"}">${mismatches.length}</span><br>`;
+    html += `&nbsp;&nbsp;• Missing from MANIFEST: <span class="${missing.length ? "warn" : "ok"}">${missing.length}</span>`;
+    html += `</div>`;
+    
+    // Mismatch breakdown
+    if (mismatches.length > 0) {
+        const criticalMismatches = mismatches.filter(m => m.diff > 1.0);
+        const minorMismatches = mismatches.filter(m => m.diff <= 1.0);
+        
+        html += `<div style="margin-bottom: 12px;">`;
+        html += `<strong>⚠️ TEMPERATURE MISMATCHES:</strong><br>`;
+        if (criticalMismatches.length > 0) {
+            html += `&nbsp;&nbsp;• Critical (>1.0°C difference): <span class="warn">${criticalMismatches.length}</span><br>`;
+        }
+        if (minorMismatches.length > 0) {
+            html += `&nbsp;&nbsp;• Minor (0.1-1.0°C difference): <span style="color: #ff8c00;">${minorMismatches.length}</span><br>`;
+        }
+        html += `</div>`;
+    }
+    
+    // Overall status
+    html += `<div>`;
+    html += `<strong>✅ OVERALL STATUS:</strong><br>`;
+    if (found === totalCheck && exactMatches === found) {
+        html += `&nbsp;&nbsp;• 🎉 <span class="ok">PERFECT MATCH!</span> All containers found with exact temperatures.`;
+    } else if (found === totalCheck && mismatches.length <= 5) {
+        html += `&nbsp;&nbsp;• ✅ <span class="ok">EXCELLENT!</span> All containers found, only ${mismatches.length} minor temperature differences.`;
+    } else if (found >= totalCheck * 0.95) {
+        html += `&nbsp;&nbsp;• 🟡 <span style="color: #ff8c00;">GOOD!</span> ${((found/totalCheck)*100).toFixed(1)}% of containers matched.`;
+    } else {
+        html += `&nbsp;&nbsp;• ⚠️ <span class="warn">ATTENTION NEEDED!</span> Only ${((found/totalCheck)*100).toFixed(1)}% of containers matched.`;
+    }
+    html += `</div>`;
+    html += `</div>`; // Close summary section
+
+    if (missing.length > 0) {
+        html += `<div class="section-title">Missing containers (in CHECK but not in MANIFEST):</div>`;
+        if (missing.length <= 10) {
+            html += `<pre>${missing.join(", ")}</pre>`;
+        } else {
+            html += `<pre>${missing.slice(0, 10).join(", ")} ... and ${missing.length - 10} more</pre>`;
+        }
+    }
+
+    if (mismatches.length > 0) {
+        html += `<div class="section-title">Temperature mismatches (Set vs Manifest):</div>`;
+        let lines = "";
+        const displayCount = Math.min(mismatches.length, 5);
+        mismatches.slice(0, displayCount).forEach(m => {
+            lines += `${m.id}: Set=${m.setT}°C, Man=${m.manT}°C, Diff=${m.diff.toFixed(2)}°C\n`;
+        });
+        if (mismatches.length > 5) {
+            lines += `... and ${mismatches.length - 5} more mismatches`;
+        }
+        html += `<pre>${lines}</pre>`;
+    } else {
+        html += `<div class="section-title">Temperature mismatches:</div><pre>None – all matched within ±0.1°C tolerance.</pre>`;
+    }
+
+    resultDiv.style.display = "block";
+    resultDiv.innerHTML = html;
+}
+
+function downloadExcel() {
+    if (!finalResults || finalResults.mismatches.length === 0) {
+        alert("No mismatches to export.");
+        return;
+    }
+
+    const rows = [["Container ID", "Set Temp", "Manifest Temp", "Difference"]];
+    finalResults.mismatches.forEach(m => {
+        rows.push([m.id, m.setT, m.manT, m.diff]);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Mismatches");
+    XLSX.writeFile(wb, "reefer_mismatches_report.xls");
+}
+</script>
+
+</body>
+</html>

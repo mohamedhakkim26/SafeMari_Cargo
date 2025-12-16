@@ -1,0 +1,66 @@
+{
+  "name": "safemari-cargo-tools",
+  "version": "1.0.0",
+  "description": "Standalone Windows offline desktop application for shipboard cargo validation",
+  "main": "app/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --inspect=5858",
+    "build": "electron-builder",
+    "build-win": "electron-builder --win",
+    "pack": "electron-builder --dir",
+    "dist": "npm run build"
+  },
+  "keywords": [
+    "cargo",
+    "shipping",
+    "validation",
+    "maritime",
+    "offline"
+  ],
+  "author": "SafeMari",
+  "license": "Proprietary",
+  "devDependencies": {
+    "electron": "^39.2.4",
+    "electron-builder": "^25.0.0"
+  },
+  "dependencies": {
+    "@xenova/transformers": "^2.17.2",
+    "exceljs": "^4.4.0",
+    "mammoth": "^1.11.0",
+    "node-tesseract-ocr": "^2.2.1",
+    "onnxruntime-node": "^1.23.2",
+    "pdf-parse": "^1.1.1",
+    "sqlite3": "^5.1.7"
+  },
+  "build": {
+    "appId": "com.safemari.cargo-tools",
+    "productName": "SafeMari Cargo Tools",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "app/",
+      "modules/",
+      "ui/",
+      "ai/",
+      "storage/",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
+      "installerLanguages": [
+        "en"
+      ],
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "menuCategory": false,
+      "runAfterFinish": false
+    }
+  }
+}

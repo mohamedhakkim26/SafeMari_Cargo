@@ -1,0 +1,7 @@
+{
+  "salt": "SafeMari2024!PrivateHMACSecretKey#CargoTools$LicenseGeneration%2024",
+  "version": "1.0",
+  "algorithm": "HMAC-SHA256",
+  "description": "Public salt for license verification - matches private secret in license generator",
+  "updated": "2025-12-03"
+}
