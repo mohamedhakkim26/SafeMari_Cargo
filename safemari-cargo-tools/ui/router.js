@@ -8,6 +8,7 @@ class Router {
         this.navLinks = document.querySelectorAll('.nav-link');
         this.currentView = 'welcome';
         this.selectedFiles = {};
+        this.viewStates = {}; // Store view states
         
         this.initializeRouter();
     }
@@ -36,6 +37,11 @@ class Router {
             }
         }
 
+        // Save current view state before navigating
+        if (this.currentView && this.currentView !== 'welcome') {
+            this.saveViewState(this.currentView);
+        }
+
         // Update navigation state
         this.updateNavigation(viewName);
         
@@ -43,6 +49,11 @@ class Router {
         try {
             this.currentView = viewName;
             await this.loadView(viewName);
+            
+            // Restore view state if available
+            if (this.viewStates[viewName]) {
+                this.restoreViewState(viewName);
+            }
         } catch (error) {
             console.error('Failed to load view:', error);
             this.showError('Failed to load view: ' + error.message);
@@ -381,29 +392,32 @@ class Router {
         this.initializeSettings();
     }
 
-    showLicenseInfo() {
+    async showLicenseInfo() {
         this.viewContainer.innerHTML = `
             <div class="view-content">
-                <h2>License Information</h2>
+                <div class="view-header">
+                    <h2>License Information</h2>
+                    <button id="closeLicenseInfo" class="btn-secondary">Close</button>
+                </div>
                 <p>View license details and activation status.</p>
                 
                 <div class="license-content">
                     <div class="info-section">
                         <h3>Current License Status</h3>
-                        <div id="licenseStatus">Loading...</div>
+                        <div id="licenseStatusInfo">Loading...</div>
                         
                         <button id="showLicenseModal" class="btn-primary">Manage License</button>
                     </div>
                     
                     <div class="info-section">
                         <h3>Application Information</h3>
-                        <div id="appInfo">Loading...</div>
+                        <div id="appInfoDetails">Loading...</div>
                     </div>
                 </div>
             </div>
         `;
         
-        this.initializeLicenseInfo();
+        await this.initializeLicenseInfo();
     }
 
     showAbout() {
@@ -426,8 +440,25 @@ class Router {
                             <li>Comprehensive Logging</li>
                         </ul>
                         
-                        <h3>Support</h3>
-                        <p>For support and licensing inquiries, please contact SafeMari support.</p>
+                        <h3>Support & Contact</h3>
+                        <div style="background: #f0f9ff; padding: 16px; border-radius: 8px; border-left: 4px solid #2563eb; margin: 16px 0;">
+                            <div style="margin-bottom: 12px;">
+                                <strong>WhatsApp Business Support:</strong>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                                <span style="font-family: monospace; font-size: 16px; font-weight: bold; color: #2563eb;">+91 93450 05036</span>
+                                <button onclick="window.safeMariAPI.openExternal('https://wa.me/919345005036')" style="background: #25D366; color: white; padding: 8px 16px; border: none; border-radius: 20px; cursor: pointer; font-size: 14px; font-weight: bold;">
+                                    Chat on WhatsApp
+                                </button>
+                            </div>
+                            <div style="font-size: 13px; color: #64748b;">
+                                For technical support, licensing inquiries, and product assistance
+                            </div>
+                        </div>
+                        
+                        <p style="margin-top: 20px; color: #64748b; font-size: 14px;">
+                            SafeMari Cargo Tools - Streamlining maritime cargo operations with intelligent automation
+                        </p>
                     </div>
                 </div>
             </div>
@@ -494,16 +525,180 @@ class Router {
         await this.loadLogs();
     }
 
-    initializeSettings() {
+    async initializeSettings() {
         console.log('Settings view initialized');
+        
+        // Load current settings
+        try {
+            const result = await window.safeMariAPI.getSettings();
+            if (result.success) {
+                const settings = result.settings;
+                
+                // Apply loaded settings to UI
+                const exportFormat = document.getElementById('exportFormat');
+                const verboseLogging = document.getElementById('verboseLogging');
+                const autoSaveResults = document.getElementById('autoSaveResults');
+                
+                if (exportFormat) exportFormat.value = settings.exportFormat || 'xlsx';
+                if (verboseLogging) verboseLogging.checked = settings.verboseLogging || false;
+                if (autoSaveResults) autoSaveResults.checked = settings.autoSaveResults || false;
+            }
+        } catch (error) {
+            console.error('Failed to load settings:', error);
+        }
+        
+        // Setup save button
+        const saveBtn = document.getElementById('saveSettings');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', async () => {
+                await this.saveSettings();
+            });
+        }
+        
+        // Setup reset button
+        const resetBtn = document.getElementById('resetSettings');
+        if (resetBtn) {
+            resetBtn.addEventListener('click', async () => {
+                await this.resetSettings();
+            });
+        }
+    }
+    
+    async saveSettings() {
+        try {
+            const exportFormat = document.getElementById('exportFormat')?.value || 'xlsx';
+            const verboseLogging = document.getElementById('verboseLogging')?.checked || false;
+            const autoSaveResults = document.getElementById('autoSaveResults')?.checked || false;
+            
+            const newSettings = {
+                exportFormat,
+                verboseLogging,
+                autoSaveResults
+            };
+            
+            const result = await window.safeMariAPI.saveSettings(newSettings);
+            
+            if (result.success) {
+                // Show success message
+                const saveBtn = document.getElementById('saveSettings');
+                const originalText = saveBtn.textContent;
+                saveBtn.textContent = 'Settings Saved!';
+                saveBtn.style.background = '#16a34a';
+                
+                setTimeout(() => {
+                    saveBtn.textContent = originalText;
+                    saveBtn.style.background = '';
+                }, 2000);
+            } else {
+                alert('Failed to save settings: ' + result.error);
+            }
+        } catch (error) {
+            console.error('Save settings error:', error);
+            alert('Error saving settings: ' + error.message);
+        }
+    }
+    
+    async resetSettings() {
+        if (confirm('Reset all settings to defaults?')) {
+            try {
+                const defaultSettings = {
+                    exportFormat: 'xlsx',
+                    verboseLogging: false,
+                    autoSaveResults: false
+                };
+                
+                const result = await window.safeMariAPI.saveSettings(defaultSettings);
+                
+                if (result.success) {
+                    // Update UI
+                    document.getElementById('exportFormat').value = 'xlsx';
+                    document.getElementById('verboseLogging').checked = false;
+                    document.getElementById('autoSaveResults').checked = false;
+                    
+                    alert('Settings reset to defaults');
+                } else {
+                    alert('Failed to reset settings: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Reset settings error:', error);
+                alert('Error resetting settings: ' + error.message);
+            }
+        }
     }
 
-    initializeLicenseInfo() {
+    async initializeLicenseInfo() {
+        // Setup close button
+        const closeBtn = document.getElementById('closeLicenseInfo');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                this.navigate('welcome');
+            });
+        }
+        
+        // Setup show license modal button
         const showModalBtn = document.getElementById('showLicenseModal');
         if (showModalBtn) {
             showModalBtn.addEventListener('click', () => {
                 document.getElementById('licenseModal').style.display = 'flex';
             });
+        }
+        
+        // Load license information
+        try {
+            const licenseInfo = await window.safeMariAPI.getLicenseInfo();
+            const appInfo = await window.safeMariAPI.getAppInfo();
+            
+            // Display license status
+            const licenseStatusDiv = document.getElementById('licenseStatusInfo');
+            if (licenseStatusDiv && licenseInfo.success) {
+                const validation = licenseInfo.validation;
+                const isValid = validation && validation.isValid;
+                
+                licenseStatusDiv.innerHTML = `
+                    <div style="background: ${isValid ? '#f0f9ff' : '#fef2f2'}; padding: 16px; border-radius: 8px; border-left: 4px solid ${isValid ? '#2563eb' : '#dc2626'};">
+                        <div style="font-weight: 600; color: ${isValid ? '#1e40af' : '#dc2626'}; margin-bottom: 8px;">
+                            Status: ${isValid ? 'Licensed' : 'Unlicensed'}
+                        </div>
+                        ${isValid ? `
+                            <div style="color: #374151; margin-bottom: 4px;">Expires: ${validation.expiry || 'Unknown'}</div>
+                            <div style="color: #374151; margin-bottom: 4px;">Days Remaining: ${validation.daysRemaining || 'Unknown'}</div>
+                            <div style="color: #374151; margin-bottom: 4px;">License Type: ${validation.licenseType || 'Standard'}</div>
+                        ` : `
+                            <div style="color: #991b1b;">License activation required to use cargo tools</div>
+                        `}
+                        <div style="color: #64748b; font-size: 12px; margin-top: 8px;">Machine ID: ${licenseInfo.machineId || 'Unknown'}</div>
+                    </div>
+                `;
+            } else {
+                licenseStatusDiv.innerHTML = '<div class="error-message">Failed to load license information</div>';
+            }
+            
+            // Display app information
+            const appInfoDiv = document.getElementById('appInfoDetails');
+            if (appInfoDiv && appInfo.success) {
+                appInfoDiv.innerHTML = `
+                    <div style="background: #f8fafc; padding: 16px; border-radius: 8px;">
+                        <div style="margin-bottom: 8px;"><strong>Application:</strong> ${appInfo.name}</div>
+                        <div style="margin-bottom: 8px;"><strong>Version:</strong> ${appInfo.version}</div>
+                        <div style="margin-bottom: 8px;"><strong>Description:</strong> ${appInfo.description}</div>
+                        <div style="color: #64748b; font-size: 12px; margin-top: 12px;">SafeMari Cargo Tools - Professional maritime cargo operations</div>
+                    </div>
+                `;
+            } else {
+                appInfoDiv.innerHTML = '<div class="error-message">Failed to load application information</div>';
+            }
+            
+        } catch (error) {
+            console.error('Failed to load license info:', error);
+            const licenseStatusDiv = document.getElementById('licenseStatusInfo');
+            const appInfoDiv = document.getElementById('appInfoDetails');
+            
+            if (licenseStatusDiv) {
+                licenseStatusDiv.innerHTML = '<div class="error-message">Error loading license information</div>';
+            }
+            if (appInfoDiv) {
+                appInfoDiv.innerHTML = '<div class="error-message">Error loading application information</div>';
+            }
         }
     }
 
@@ -538,6 +733,30 @@ class Router {
         });
 
         // Enhanced drag and drop handlers
+        dropZone.addEventListener('click', async (e) => {
+            // Allow clicking anywhere in the drop zone to select file
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const filters = [];
+            if (allowedExtensions.includes('xlsx') || allowedExtensions.includes('xls')) {
+                filters.push({ name: 'Excel Files', extensions: ['xlsx', 'xls'] });
+            }
+            if (allowedExtensions.includes('pdf')) {
+                filters.push({ name: 'PDF Files', extensions: ['pdf'] });
+            }
+            if (allowedExtensions.includes('docx') || allowedExtensions.includes('doc')) {
+                filters.push({ name: 'Word Documents', extensions: ['docx', 'doc'] });
+            }
+            filters.push({ name: 'All Files', extensions: ['*'] });
+
+            const result = await window.safeMariAPI.selectFile({ filters });
+            
+            if (result.success && !result.cancelled) {
+                this.handleFileSelection(fileType, result.filePath);
+            }
+        });
+        
         dropZone.addEventListener('dragenter', (e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -1537,6 +1756,82 @@ class Router {
     showError(message) {
         console.error('Router Error:', message);
         alert(message);
+    }
+    
+    saveViewState(viewName) {
+        // Save selected files and other view-specific state
+        this.viewStates[viewName] = {
+            selectedFiles: { ...this.selectedFiles },
+            timestamp: Date.now()
+        };
+        
+        // Also save results if they exist
+        if (viewName === 'reefer-temp' && window.reeferDownloadData) {
+            this.viewStates[viewName].results = window.reeferDownloadData;
+        }
+        if (viewName === 'ct-stowage' && this.ctResultData) {
+            this.viewStates[viewName].results = this.ctResultData;
+        }
+        if (viewName === 'dg-checker' && window.dgDownloadData) {
+            this.viewStates[viewName].results = window.dgDownloadData;
+        }
+        if (viewName === 'list-compare' && window.compareDownloadData) {
+            this.viewStates[viewName].results = window.compareDownloadData;
+        }
+    }
+    
+    restoreViewState(viewName) {
+        const state = this.viewStates[viewName];
+        if (!state) return;
+        
+        // Restore selected files
+        if (state.selectedFiles) {
+            this.selectedFiles = { ...state.selectedFiles };
+            
+            // Update UI to show selected files
+            Object.keys(state.selectedFiles).forEach(fileType => {
+                const filePath = state.selectedFiles[fileType];
+                if (filePath) {
+                    this.updateDropZoneUI(fileType, filePath);
+                }
+            });
+            
+            // Update process button
+            setTimeout(() => this.updateProcessButton(), 100);
+        }
+        
+        // Restore results if they exist
+        if (state.results) {
+            if (viewName === 'reefer-temp') {
+                window.reeferDownloadData = state.results;
+                this.displayReeferResults({ success: true, ...state.results });
+            } else if (viewName === 'ct-stowage') {
+                this.ctResultData = state.results;
+                this.displayCTResults(state.results);
+            } else if (viewName === 'dg-checker') {
+                window.dgDownloadData = state.results;
+                this.displayDGResults({ success: true, ...state.results });
+            } else if (viewName === 'list-compare') {
+                window.compareDownloadData = state.results;
+                this.displayCompareResults({ success: true, ...state.results });
+            }
+        }
+    }
+    
+    updateDropZoneUI(fileType, filePath) {
+        const dropZone = document.querySelector(`[data-file-type="${fileType}"]`);
+        if (dropZone) {
+            dropZone.classList.add('has-file');
+            const content = dropZone.querySelector('.drop-zone-content');
+            if (content) {
+                const fileName = filePath.split(/[\\\/]/).pop();
+                content.innerHTML = `
+                    <h4>✓ File Selected</h4>
+                    <p><strong>${fileName}</strong></p>
+                    <p>Click to change file</p>
+                `;
+            }
+        }
     }
 
     async downloadReeferReportGlobal() {

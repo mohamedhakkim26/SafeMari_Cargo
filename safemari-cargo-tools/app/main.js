@@ -241,6 +241,7 @@ class SafeMariApp {
                     filters: options.filters || [
                         { name: 'Excel Files', extensions: ['xlsx', 'xls'] },
                         { name: 'PDF Files', extensions: ['pdf'] },
+                        { name: 'Word Documents', extensions: ['docx', 'doc'] },
                         { name: 'All Files', extensions: ['*'] }
                     ]
                 });
@@ -332,6 +333,17 @@ class SafeMariApp {
             };
         });
 
+        // Open external URL handler
+        ipcMain.handle('open-external', async (event, url) => {
+            try {
+                const { shell } = require('electron');
+                await shell.openExternal(url);
+                return { success: true };
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+        });
+
         // Get AI system status
         ipcMain.handle('get-ai-status', async () => {
             try {
@@ -407,12 +419,33 @@ class SafeMariApp {
 
         // Settings handlers
         ipcMain.handle('get-settings', async () => {
-            return { success: true, settings: this.settings };
+            try {
+                // Load settings from file if exists
+                const settingsPath = path.join(__dirname, '..', 'storage', 'settings.json');
+                if (fs.existsSync(settingsPath)) {
+                    const savedSettings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+                    this.settings = { ...this.settings, ...savedSettings };
+                }
+                return { success: true, settings: this.settings };
+            } catch (error) {
+                return { success: true, settings: this.settings }; // Return defaults on error
+            }
         });
 
         ipcMain.handle('save-settings', async (event, newSettings) => {
             try {
                 this.settings = { ...this.settings, ...newSettings };
+                
+                // Save settings to file
+                const settingsPath = path.join(__dirname, '..', 'storage', 'settings.json');
+                const storageDir = path.dirname(settingsPath);
+                
+                // Ensure storage directory exists
+                if (!fs.existsSync(storageDir)) {
+                    fs.mkdirSync(storageDir, { recursive: true });
+                }
+                
+                fs.writeFileSync(settingsPath, JSON.stringify(this.settings, null, 2));
                 return { success: true };
             } catch (error) {
                 return { success: false, error: error.message };
@@ -572,6 +605,42 @@ class SafeMariApp {
                 
             } catch (error) {
                 console.error('DG download error:', error);
+                return { success: false, error: error.message };
+            }
+        });
+
+        ipcMain.handle('download-compare-report', async (event, data) => {
+            try {
+                const { dialog } = require('electron');
+                
+                const result = await dialog.showSaveDialog(this.mainWindow, {
+                    title: 'Save List Comparison Report',
+                    defaultPath: data.filename || 'list_comparison_report.xlsx',
+                    filters: [
+                        { name: 'Excel Files', extensions: ['xlsx'] },
+                        { name: 'All Files', extensions: ['*'] }
+                    ]
+                });
+                
+                if (result.canceled) {
+                    return { success: false, cancelled: true };
+                }
+                
+                // Use the existing export functionality from ListCompare
+                const exportResult = await this.listCompare.exportResults(result.filePath);
+                
+                if (exportResult.success) {
+                    return { 
+                        success: true, 
+                        filePath: result.filePath,
+                        message: 'List comparison report exported successfully' 
+                    };
+                } else {
+                    return exportResult;
+                }
+                
+            } catch (error) {
+                console.error('Compare download error:', error);
                 return { success: false, error: error.message };
             }
         });

@@ -57,6 +57,14 @@ async function initializeLicenseCheck() {
 }
 
 function setupLicenseModalHandlers() {
+    // Close modal button
+    const closeBtn = document.getElementById('closeLicenseModal');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            document.getElementById('licenseModal').style.display = 'none';
+        });
+    }
+
     // Copy Machine ID button
     const copyBtn = document.getElementById('copyMachineId');
     if (copyBtn) {
