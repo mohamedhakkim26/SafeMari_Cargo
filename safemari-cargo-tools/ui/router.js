@@ -1320,14 +1320,13 @@ class Router {
         const matched = result.results.matched || 0;
         const missing = result.results.missing || 0;
         const totalContainers = result.results.totalContainers || 0;
-        const accuracy = totalContainers > 0 ? ((matched / totalContainers) * 100).toFixed(1) : 0;
         const blocksWithKey = result.results.blocksWithKey || [];
         const missingContainers = blocksWithKey.filter(block => !block.stow).map(block => block.id);
         
         resultsDiv.innerHTML = `
             <h2 style="color: #2563eb; margin-bottom: 20px;">CT Stowage Results</h2>
             
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px;">
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px;">
                 <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #2563eb;">
                     <div style="color: #64748b; font-size: 12px; margin-bottom: 4px;">TOTAL IN CT SHEET:</div>
                     <div style="font-size: 28px; font-weight: bold; color: #2563eb;">${totalContainers}</div>
@@ -1336,11 +1335,6 @@ class Router {
                 <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #16a34a;">
                     <div style="color: #64748b; font-size: 12px; margin-bottom: 4px;">FOUND IN FULL LIST:</div>
                     <div style="font-size: 28px; font-weight: bold; color: #16a34a;">${matched}</div>
-                </div>
-                
-                <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #16a34a;">
-                    <div style="color: #64748b; font-size: 12px; margin-bottom: 4px;">ACCURACY:</div>
-                    <div style="font-size: 28px; font-weight: bold; color: #16a34a;">${accuracy}%</div>
                 </div>
             </div>
             
